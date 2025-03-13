@@ -111,6 +111,20 @@ def get_photos(place_id):
     except requests.exceptions.RequestException as e:
         return f"❌ 無法獲取照片：{e}"
 
+# 🔄 分段訊息的函數
+def split_message(message, limit=5000):
+    # 分段長訊息
+    messages = []
+    while len(message) > limit:
+        # 找到最後一個適合分割的位置（此處以 "\n" 為分割點）
+        split_pos = message.rfind("\n", 0, limit)
+        if split_pos == -1:  # 如果沒有找到分割點，直接從 limit 處分割
+            split_pos = limit
+        messages.append(message[:split_pos])
+        message = message[split_pos:].strip()
+    messages.append(message)
+    return messages
+
 # 🔄 處理使用者發送的訊息
 @handler.add(MessageEvent, message=TextMessage)
 def handle_message(event):
@@ -121,7 +135,10 @@ def handle_message(event):
     else:
         result = "❌ 請輸入 **城市名稱 + 美食類型**（例如：「台北燒肉」）。"
 
-    line_bot_api.reply_message(event.reply_token, TextSendMessage(text=result))
+    # 分段發送訊息
+    message_parts = split_message(result)
+    for part in message_parts:
+        line_bot_api.reply_message(event.reply_token, TextSendMessage(text=part))
 
 # 📌 Line Bot Webhook 設定
 @app.route("/callback", methods=['POST'])
