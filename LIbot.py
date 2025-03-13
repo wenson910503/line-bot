@@ -1,4 +1,20 @@
+# -*- coding: utf-8 -*-
+import os
 import requests
+from flask import Flask, request, abort
+from linebot import LineBotApi, WebhookHandler
+from linebot.exceptions import InvalidSignatureError
+from linebot.models import MessageEvent, TextMessage, TextSendMessage
+
+app = Flask(__name__)
+
+
+# 🚀 填入你的 LINE Bot API Key
+line_bot_api = LineBotApi('i8DEpkz7jgRNnqRR4mWbPxC5oesrSpXbw2c+5xpzkLASeiBvdtv1uny/4/iXeO4lJygtxMZylP6IlFmQq/Lva/Ftd/H05aGKjTFlHZ3iSZo1sEMmBKRVMTTemEtU0zKtk9S9nqXIGc8CnOWSS80zKAdB04t89/1O/w1cDnyilFU=')
+handler =WebhookHandler ('e95d4cac941b6109c3379f5cb7a7c46c')
+
+# 🚀 填入你的 Google Places API Key
+GOOGLE_PLACES_API_KEY = 'AIzaSyBqbjGjjpt3Bxo9RB15DE4uVBmoBRlNXVM'
 
 # 📍 Google Places API 查詢函數
 def search_restaurants(location):
@@ -21,67 +37,48 @@ def search_restaurants(location):
         # 取得前 5 間餐廳
         restaurants = data["results"][:5]
         reply_message = "🍽 熱門餐廳推薦 🍽\n\n"
-        all_messages = []  # 儲存所有分段訊息
 
         for index, r in enumerate(restaurants):
             name = r.get("name", "未知餐廳")
             rating = r.get("rating", "無評分")
             address = r.get("formatted_address", "無地址資訊")
             business_status = r.get("business_status", "無營業資訊")
-            place_id = r.get("place_id")
 
-            # Retrieve details for each restaurant to get reviews
-            place_details_url = "https://maps.googleapis.com/maps/api/place/details/json"
-            details_params = {
-                "place_id": place_id,
-                "key": GOOGLE_PLACES_API_KEY,
-            }
-            details_response = requests.get(place_details_url, params=details_params, timeout=10)
-            details_response.raise_for_status()
-            details_data = details_response.json()
+            reply_message += f"🔹 **{index+1}. {name}**\n"
+            reply_message += f"⭐ 評分：{rating}/5.0\n"
+            reply_message += f"📍 地址：{address}\n"
+            reply_message += f"🕒 營業狀況：{business_status}\n\n"
 
-            # Get reviews from place details
-            reviews = details_data.get("result", {}).get("reviews", [])
-            best_review_text = "沒有可用的評價"
-            best_review_image = None
-
-            if reviews:
-                # Assuming the best review is the one with the highest rating
-                best_review = max(reviews, key=lambda review: review.get("rating", 0))
-                best_review_text = best_review.get("text", "無評價內容")
-                best_review_image = best_review.get("profile_photo_url", None)
-
-            # Try getting photo reference for richer information
-            photos = r.get("photos", [])
-            photo_reference = photos[0]["photo_reference"] if photos else None
-            photo_url = None
-            if photo_reference:
-                photo_url = f"https://maps.googleapis.com/maps/api/place/photo?maxwidth=400&photoreference={photo_reference}&key={GOOGLE_PLACES_API_KEY}"
-
-            # Build the message for this restaurant
-            restaurant_message = f"🔹 **{index+1}. {name}**\n"
-            restaurant_message += f"⭐ 評分：{rating}/5.0\n"
-            restaurant_message += f"📍 地址：{address}\n"
-            restaurant_message += f"🕒 營業狀況：{business_status}\n"
-            if photo_url:
-                restaurant_message += f"📸 [餐廳照片]({photo_url})\n"
-            restaurant_message += f"📝 最佳評價：\n{best_review_text}\n"
-            if best_review_image:
-                restaurant_message += f"📷 評論圖片：[查看圖片]({best_review_image})\n"
-            restaurant_message += "\n"
-
-            # If adding this message exceeds 5000 characters, split it into a new message
-            if len(reply_message + restaurant_message) > 5000:
-                all_messages.append(reply_message.strip())  # Save the current message
-                reply_message = "🍽 熱門餐廳推薦 🍽\n\n"  # Start a new message
-
-            reply_message += restaurant_message  # Append the restaurant info
-
-        # Add the final message if it's not empty
-        if reply_message.strip():
-            all_messages.append(reply_message.strip())
-
-        return "\n\n---\n\n".join(all_messages)  # Join all the segments
+        return reply_message.strip()
 
     except requests.exceptions.RequestException as e:
         return f"❌ 無法獲取餐廳資訊：{e}"
+
+# 🔄 處理使用者發送的訊息
+@handler.add(MessageEvent, message=TextMessage)
+def handle_message(event):
+    user_input = event.message.text.strip()
+
+    if len(user_input) >= 2:  # 限制最小字數，避免無效查詢
+        result = search_restaurants(user_input)
+    else:
+        result = "❌ 請輸入 **城市名稱 + 美食類型**（例如：「台北燒肉」）。"
+
+    line_bot_api.reply_message(event.reply_token, TextSendMessage(text=result))
+
+# 📌 Line Bot Webhook 設定
+@app.route("/callback", methods=['POST'])
+def callback():
+    signature = request.headers.get('X-Line-Signature', '')
+    body = request.get_data(as_text=True)
+
+    try:
+        handler.handle(body, signature)
+    except InvalidSignatureError:
+        abort(400)
+
+    return 'OK'
+
+# 🔥 啟動 Flask 應用程式
+if __name__ == '__main__':
+    app.run(host='0.0.0.0', port=int(os.environ.get('PORT', 5000)))
