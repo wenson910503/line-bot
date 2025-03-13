@@ -17,7 +17,7 @@ handler =WebhookHandler ('e95d4cac941b6109c3379f5cb7a7c46c')
 # 🚀 填入你的 Google Places API Key
 GOOGLE_PLACES_API_KEY = 'AIzaSyBqbjGjjpt3Bxo9RB15DE4uVBmoBRlNXVM'
 
-# 📍 Google Places API 查詢函數
+# 📍 Google Places API 查詢函數（加入餐廳排名）
 def search_restaurants(location):
     url = "https://maps.googleapis.com/maps/api/place/textsearch/json"
     params = {
@@ -35,17 +35,18 @@ def search_restaurants(location):
         if "results" not in data or not data["results"]:
             return "😢 沒有找到相關餐廳，請換個關鍵字試試看！"
 
-        # 取得前 5 間餐廳
-        restaurants = data["results"][:5]
-        reply_message = "🍽 熱門餐廳推薦 🍽\n\n"
+        # 按評分排序（由高到低）
+        restaurants = sorted(data["results"], key=lambda r: r.get("rating", 0), reverse=True)[:5]
+        
+        reply_message = "🍽 **熱門餐廳推薦（依評分排序）** 🍽\n\n"
 
-        for index, r in enumerate(restaurants):
+        for index, r in enumerate(restaurants, start=1):
             name = r.get("name", "未知餐廳")
             rating = r.get("rating", "無評分")
             address = r.get("formatted_address", "無地址資訊")
             business_status = r.get("business_status", "無營業資訊")
 
-            reply_message += f"🔹 **{index+1}. {name}**\n"
+            reply_message += f"🏆 **{index}. {name}**\n"
             reply_message += f"⭐ 評分：{rating}/5.0\n"
             reply_message += f"📍 地址：{address}\n"
             reply_message += f"🕒 營業狀況：{business_status}\n\n"
