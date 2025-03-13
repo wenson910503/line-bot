@@ -79,10 +79,12 @@ def get_reviews(place_id):
 
         if "result" in data and "reviews" in data["result"]:
             reviews = data["result"]["reviews"]
-            if reviews:
-                # 取第一條評論作為最佳評論
-                best_review = reviews[0]["text"]
-                return best_review
+            for review in reviews:
+                # 優先選擇中文評論
+                if 'zh' in review['language']:  # 確保評論為中文
+                    return review['text']
+            # 若沒有中文評論，選擇其他語言的評論
+            return reviews[0]['text']
         return None
     except requests.exceptions.RequestException as e:
         return f"❌ 無法獲取評論：{e}"
@@ -103,7 +105,7 @@ def get_photos(place_id):
         if "result" in data and "photos" in data["result"]:
             photos = data["result"]["photos"]
             if photos:
-                # 使用第一張照片的 photo_reference
+                # 使用第一張照片的 photo_reference 並返回縮圖 URL
                 photo_reference = photos[0]["photo_reference"]
                 photo_url = f"https://maps.googleapis.com/maps/api/place/photo?maxwidth=400&photoreference={photo_reference}&key={GOOGLE_PLACES_API_KEY}"
                 return photo_url
