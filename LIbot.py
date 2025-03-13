@@ -15,7 +15,7 @@ handler = WebhookHandler('e95d4cac941b6109c3379f5cb7a7c46c')
 # 🚀 填入你的 Google Places API Key
 GOOGLE_PLACES_API_KEY = 'AIzaSyBqbjGjjpt3Bxo9RB15DE4uVBmoBRlNXVM'
 
-# 📍 Google Places API 查詢函數（加入餐廳排名及評論、圖片）
+# 📍 Google Places API 查詢函數（顯示最多 3 間餐廳，包含評論與圖片）
 def search_restaurants(location):
     url = "https://maps.googleapis.com/maps/api/place/textsearch/json"
     params = {
@@ -29,14 +29,14 @@ def search_restaurants(location):
         response.raise_for_status()
         data = response.json()
 
-        # 如果 API 沒回傳結果
         if "results" not in data or not data["results"]:
             return "😢 沒有找到相關餐廳，請換個關鍵字試試看！"
 
-        # 按評分排序（由高到低）
-        restaurants = sorted(data["results"], key=lambda r: r.get("rating", 0), reverse=True)[:5]
-        
+        # 按評分排序（由高到低），只顯示 3 間
+        restaurants = sorted(data["results"], key=lambda r: r.get("rating", 0), reverse=True)[:3]
+
         reply_message = "🍽 **熱門餐廳推薦（依評分排序）** 🍽\n\n"
+        images = []
 
         for index, r in enumerate(restaurants, start=1):
             name = r.get("name", "未知餐廳")
@@ -45,9 +45,9 @@ def search_restaurants(location):
             business_status = r.get("business_status", "無營業資訊")
             place_id = r.get("place_id", "")
 
-            # 查詢每間餐廳的評論
-            reviews = get_reviews(place_id)  # 獲取餐廳評論
-            photos = get_photos(place_id)  # 獲取餐廳照片
+            # 獲取評論與圖片
+            reviews = get_reviews(place_id)
+            photo_url = get_photos(place_id)
 
             reply_message += f"🏆 **{index}. {name}**\n"
             reply_message += f"⭐ 評分：{rating}/5.0\n"
@@ -55,25 +55,25 @@ def search_restaurants(location):
             reply_message += f"🕒 營業狀況：{business_status}\n"
             if reviews:
                 reply_message += f"💬 最佳評論：{reviews}\n"
-            if photos:
-                reply_message += f"📸 相關照片：\n"  # 顯示照片
-                reply_message += f"---\n"  # 分隔線，將圖片與文字分開
+            if photo_url:
+                images.append(photo_url)  # 儲存圖片 URL
 
             reply_message += "\n"
 
-        return reply_message.strip()
+        return reply_message.strip(), images  # 回傳文字內容 + 圖片列表
 
     except requests.exceptions.RequestException as e:
-        return f"❌ 無法獲取餐廳資訊：{e}"
+        return f"❌ 無法獲取餐廳資訊：{e}", []
 
 # 🔄 獲取餐廳評論的函數
 def get_reviews(place_id):
-    review_url = f"https://maps.googleapis.com/maps/api/place/details/json"
+    review_url = "https://maps.googleapis.com/maps/api/place/details/json"
     params = {
-        "placeid": place_id,
+        "place_id": place_id,
         "key": GOOGLE_PLACES_API_KEY,
+        "language": "zh-TW"
     }
-    
+
     try:
         response = requests.get(review_url, params=params, timeout=10)
         response.raise_for_status()
@@ -82,20 +82,18 @@ def get_reviews(place_id):
         if "result" in data and "reviews" in data["result"]:
             reviews = data["result"]["reviews"]
             for review in reviews:
-                # 優先選擇中文評論
-                if 'zh' in review['language']:  # 確保評論為中文
+                if 'zh' in review['language']:  # 優先選擇中文評論
                     return review['text']
-            # 若沒有中文評論，選擇其他語言的評論
-            return reviews[0]['text']
+            return reviews[0]['text'] if reviews else None
         return None
     except requests.exceptions.RequestException as e:
-        return f"❌ 無法獲取評論：{e}"
+        return None
 
 # 🔄 獲取餐廳照片的函數
 def get_photos(place_id):
-    photo_url = f"https://maps.googleapis.com/maps/api/place/details/json"
+    photo_url = "https://maps.googleapis.com/maps/api/place/details/json"
     params = {
-        "placeid": place_id,
+        "place_id": place_id,
         "key": GOOGLE_PLACES_API_KEY,
     }
 
@@ -107,23 +105,18 @@ def get_photos(place_id):
         if "result" in data and "photos" in data["result"]:
             photos = data["result"]["photos"]
             if photos:
-                # 使用第一張照片的 photo_reference 並返回縮圖 URL
                 photo_reference = photos[0]["photo_reference"]
-                # 使用 `maxwidth` 來獲取較大尺寸的圖片
-                photo_url = f"https://maps.googleapis.com/maps/api/place/photo?maxwidth=800&photoreference={photo_reference}&key={GOOGLE_PLACES_API_KEY}"
-                return photo_url
+                return f"https://maps.googleapis.com/maps/api/place/photo?maxwidth=800&photoreference={photo_reference}&key={GOOGLE_PLACES_API_KEY}"
         return None
     except requests.exceptions.RequestException as e:
-        return f"❌ 無法獲取照片：{e}"
+        return None
 
 # 🔄 分段訊息的函數
 def split_message(message, limit=5000):
-    # 分段長訊息
     messages = []
     while len(message) > limit:
-        # 找到最後一個適合分割的位置（此處以 "\n" 為分割點）
         split_pos = message.rfind("\n", 0, limit)
-        if split_pos == -1:  # 如果沒有找到分割點，直接從 limit 處分割
+        if split_pos == -1:
             split_pos = limit
         messages.append(message[:split_pos])
         message = message[split_pos:].strip()
@@ -135,31 +128,26 @@ def split_message(message, limit=5000):
 def handle_message(event):
     user_input = event.message.text.strip()
 
-    if len(user_input) >= 2:  # 限制最小字數，避免無效查詢
-        result = search_restaurants(user_input)
+    if len(user_input) >= 2:  # 限制最小字數
+        result, images = search_restaurants(user_input)
     else:
         result = "❌ 請輸入 **城市名稱 + 美食類型**（例如：「台北燒肉」）。"
+        images = []
 
     # 分段發送訊息
     message_parts = split_message(result)
-    for part in message_parts:
-        # 檢查是否有圖片
-        if "相關照片" in part:
-            # 提取圖片 URL
-            photo_url = get_photos(user_input) 
-            if photo_url:
-                # 若有圖片URL，嵌入圖片
-                line_bot_api.reply_message(
-                    event.reply_token,
-                    [
-                        TextSendMessage(text=part),
-                        ImageSendMessage(original_content_url=photo_url, preview_image_url=photo_url)
-                    ]
-                )
-            else:
-                line_bot_api.reply_message(event.reply_token, TextSendMessage(text=part))
-        else:
-            line_bot_api.reply_message(event.reply_token, TextSendMessage(text=part))
+
+    # 第一則訊息使用 reply_message
+    line_bot_api.reply_message(event.reply_token, TextSendMessage(text=message_parts[0]))
+
+    # 其餘文字訊息使用 push_message
+    if len(message_parts) > 1:
+        for part in message_parts[1:]:
+            line_bot_api.push_message(event.source.user_id, TextSendMessage(text=part))
+
+    # 發送圖片（如果有）
+    for img_url in images:
+        line_bot_api.push_message(event.source.user_id, ImageSendMessage(original_content_url=img_url, preview_image_url=img_url))
 
 # 📌 Line Bot Webhook 設定
 @app.route("/callback", methods=['POST'])
