@@ -38,16 +38,18 @@ def search_restaurants(location):
         # 取得前 5 間餐廳
         restaurants = data["results"][:5]
       reply_message = "🍽 熱門餐廳推薦 🍽\n\n"
-for index, r in enumerate(restaurants):
-    name = r.get("name", "未知餐廳")
-    rating = r.get("rating", "無評分")
-    address = r.get("formatted_address", "無地址資訊")
-    business_status = r.get("business_status", "無營業資訊")
+ reply_message = "🍽 **熱門餐廳推薦** 🍽\n\n"
 
-    reply_message += f"🔹 {index+1}. {name}\n"
-    reply_message += f"⭐ 評分：{rating}/5.0\n"
-    reply_message += f"📍 地址：{address}\n"
-    reply_message += f"🕒 營業狀況：{business_status}\n\n"
+        for index, r in enumerate(restaurants):
+            name = r.get("name", "未知餐廳")
+            rating = r.get("rating", "無評分")
+            address = r.get("formatted_address", "無地址資訊")
+            business_status = r.get("business_status", "無營業資訊")
+
+            reply_message += f"🔹 **{index+1}. {name}**\n"
+            reply_message += f"⭐ 評分：{rating}/5.0\n"
+            reply_message += f"📍 地址：{address}\n"
+            reply_message += f"🕒 營業狀況：{business_status}\n\n"
 
         return reply_message.strip()
 
