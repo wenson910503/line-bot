@@ -4,7 +4,7 @@ import requests
 from flask import Flask, request, abort
 from linebot import LineBotApi, WebhookHandler
 from linebot.exceptions import InvalidSignatureError
-from linebot.models import MessageEvent, TextMessage, TextSendMessage
+from linebot.models import MessageEvent, TextMessage, TextSendMessage, ImageSendMessage
 
 app = Flask(__name__)
 
@@ -56,7 +56,9 @@ def search_restaurants(location):
             if reviews:
                 reply_message += f"💬 最佳評論：{reviews}\n"
             if photos:
-                reply_message += f"📸 相關照片：{photos}\n"
+                reply_message += f"📸 相關照片：\n"  # 顯示照片
+                reply_message += f"---\n"  # 分隔線，將圖片與文字分開
+
             reply_message += "\n"
 
         return reply_message.strip()
@@ -107,7 +109,7 @@ def get_photos(place_id):
             if photos:
                 # 使用第一張照片的 photo_reference 並返回縮圖 URL
                 photo_reference = photos[0]["photo_reference"]
-                photo_url = f"https://maps.googleapis.com/maps/api/place/photo?maxwidth=400&photoreference={photo_reference}&key={GOOGLE_PLACES_API_KEY}"
+                photo_url = f"https://maps.googleapis.com/maps/api/place/photo?maxwidth=800&photoreference={photo_reference}&key={GOOGLE_PLACES_API_KEY}"
                 return photo_url
         return None
     except requests.exceptions.RequestException as e:
@@ -140,7 +142,23 @@ def handle_message(event):
     # 分段發送訊息
     message_parts = split_message(result)
     for part in message_parts:
-        line_bot_api.reply_message(event.reply_token, TextSendMessage(text=part))
+        # 檢查是否有圖片
+        if "相關照片" in part:
+            # 提取圖片 URL
+            photo_url = get_photos(user_input) 
+            if photo_url:
+                # 若有圖片URL，嵌入圖片
+                line_bot_api.reply_message(
+                    event.reply_token,
+                    [
+                        TextSendMessage(text=part),
+                        ImageSendMessage(original_content_url=photo_url, preview_image_url=photo_url)
+                    ]
+                )
+            else:
+                line_bot_api.reply_message(event.reply_token, TextSendMessage(text=part))
+        else:
+            line_bot_api.reply_message(event.reply_token, TextSendMessage(text=part))
 
 # 📌 Line Bot Webhook 設定
 @app.route("/callback", methods=['POST'])
