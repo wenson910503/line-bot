@@ -15,7 +15,7 @@ handler = WebhookHandler('e95d4cac941b6109c3379f5cb7a7c46c')
 # 🚀 填入你的 Google Places API Key
 GOOGLE_PLACES_API_KEY = 'AIzaSyBqbjGjjpt3Bxo9RB15DE4uVBmoBRlNXVM'
 
-# 📍 Google Places API 查詢函數（加入餐廳排名及評論、圖片）
+# 📍 Google Places API 查詢函數（加入餐廳排名與圖片）
 def search_restaurants(location):
     url = "https://maps.googleapis.com/maps/api/place/textsearch/json"
     params = {
@@ -36,84 +36,52 @@ def search_restaurants(location):
         # 按評分排序（由高到低）
         restaurants = sorted(data["results"], key=lambda r: r.get("rating", 0), reverse=True)[:5]
         
-        reply_message = "🍽 **熱門餐廳推薦（依評分排序）** 🍽\n\n"
+        messages = []
 
         for index, r in enumerate(restaurants, start=1):
             name = r.get("name", "未知餐廳")
             rating = r.get("rating", "無評分")
             address = r.get("formatted_address", "無地址資訊")
             business_status = r.get("business_status", "無營業資訊")
-            place_id = r.get("place_id", "")
 
-            # 查詢每間餐廳的評論
-            reviews = get_reviews(place_id)  # 獲取餐廳評論
-            photos = get_photos(place_id)  # 獲取餐廳照片
+            reply_text = (
+                f"🏆 **{index}. {name}**\n"
+                f"⭐ 評分：{rating}/5.0\n"
+                f"📍 地址：{address}\n"
+                f"🕒 營業狀況：{business_status}"
+            )
 
-            reply_message += f"🏆 **{index}. {name}**\n"
-            reply_message += f"⭐ 評分：{rating}/5.0\n"
-            reply_message += f"📍 地址：{address}\n"
-            reply_message += f"🕒 營業狀況：{business_status}\n"
-            if reviews:
-                reply_message += f"💬 最佳評論：{reviews}\n"
-            if photos:
-                reply_message += f"📸 相關照片：\n"  # 顯示照片
-                reply_message += f"---\n"  # 分隔線，將圖片與文字分開
+            # 檢查是否有圖片
+            photo_url = None
+            if "photos" in r and r["photos"]:
+                photo_reference = r["photos"][0]["photo_reference"]
+                photo_url = f"https://maps.googleapis.com/maps/api/place/photo?maxwidth=400&photoreference={photo_reference}&key={GOOGLE_PLACES_API_KEY}"
 
-            reply_message += "\n"
+            # 回應文字訊息
+            messages.append(TextSendMessage(text=reply_text))
 
-        return reply_message.strip()
+            # 回應圖片訊息（如果有圖片）
+            if photo_url:
+                from linebot.models import ImageSendMessage
+                messages.append(ImageSendMessage(original_content_url=photo_url, preview_image_url=photo_url))
+
+        return messages
 
     except requests.exceptions.RequestException as e:
-        return f"❌ 無法獲取餐廳資訊：{e}"
+        return [TextSendMessage(text=f"❌ 無法獲取餐廳資訊：{e}")]
 
-# 🔄 獲取餐廳評論的函數
-def get_reviews(place_id):
-    review_url = f"https://maps.googleapis.com/maps/api/place/details/json"
-    params = {
-        "placeid": place_id,
-        "key": GOOGLE_PLACES_API_KEY,
-    }
-    
-    try:
-        response = requests.get(review_url, params=params, timeout=10)
-        response.raise_for_status()
-        data = response.json()
+# 🔄 處理使用者發送的訊息
+@handler.add(MessageEvent, message=TextMessage)
+def handle_message(event):
+    user_input = event.message.text.strip()
 
-        if "result" in data and "reviews" in data["result"]:
-            reviews = data["result"]["reviews"]
-            for review in reviews:
-                # 優先選擇中文評論
-                if 'zh' in review['language']:  # 確保評論為中文
-                    return review['text']
-            # 若沒有中文評論，選擇其他語言的評論
-            return reviews[0]['text']
-        return None
-    except requests.exceptions.RequestException as e:
-        return f"❌ 無法獲取評論：{e}"
+    if len(user_input) >= 2:  # 限制最小字數，避免無效查詢
+        results = search_restaurants(user_input)
+    else:
+        results = [TextSendMessage(text="❌ 請輸入 **城市名稱 + 美食類型**（例如：「台北燒肉」）。")]
 
-# 🔄 獲取餐廳照片的函數
-def get_photos(place_id):
-    photo_url = f"https://maps.googleapis.com/maps/api/place/details/json"
-    params = {
-        "placeid": place_id,
-        "key": GOOGLE_PLACES_API_KEY,
-    }
+    line_bot_api.reply_message(event.reply_token, results)
 
-    try:
-        response = requests.get(photo_url, params=params, timeout=10)
-        response.raise_for_status()
-        data = response.json()
-
-        if "result" in data and "photos" in data["result"]:
-            photos = data["result"]["photos"]
-            if photos:
-                # 使用第一張照片的 photo_reference 並返回縮圖 URL
-                photo_reference = photos[0]["photo_reference"]
-                photo_url = f"https://maps.googleapis.com/maps/api/place/photo?maxwidth=800&photoreference={photo_reference}&key={GOOGLE_PLACES_API_KEY}"
-                return photo_url
-        return None
-    except requests.exceptions.RequestException as e:
-        return f"❌ 無法獲取照片：{e}"
 
 # 🔄 分段訊息的函數
 def split_message(message, limit=5000):
