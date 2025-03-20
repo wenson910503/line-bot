@@ -1,5 +1,13 @@
 from PIL import Image, ImageDraw, ImageFont
 import requests
+import os
+
+# 確保 Pillow 已安裝
+try:
+    from PIL import Image
+except ImportError:
+    os.system("pip install Pillow")
+    from PIL import Image  # 安裝後重新導入
 
 def search_restaurants(location):
     url = "https://maps.googleapis.com/maps/api/place/textsearch/json"
