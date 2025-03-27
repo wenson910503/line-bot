@@ -12,14 +12,15 @@ line_bot_api = LineBotApi('i8DEpkz7jgRNnqRR4mWbPxC5oesrSpXbw2c+5xpzkLASeiBvdtv1u
 handler = WebhookHandler('e95d4cac941b6109c3379f5cb7a7c46c')
 
 # 🚀 填入你的 Google Places API Key
-GOOGLE_API_KEY = 'AIzaSyBqbjGjjpt3Bxo9RB15DE4uVBmoBRlNXVM'
+GOOGLE_PLACES_API_KEY = 'AIzaSyBqbjGjjpt3Bxo9RB15DE4uVBmoBRlNXVM'
+GOOGLE_MAPS_API_KEY = 'AIzaSyBqbjGjjpt3Bxo9RB15DE4uVBmoBRlNXVM'
 
 # 📍 Google Places API 查詢函數（顯示最多 3 間餐廳）
 def search_restaurants(location):
     url = "https://maps.googleapis.com/maps/api/place/textsearch/json"
     params = {
         "query": f"{location} 餐廳",
-        "key": GOOGLE_API_KEY,
+        "key":GOOGLE_PLACES_API_KEY ,
         "language": "zh-TW",
     }
 
@@ -45,7 +46,7 @@ def search_restaurants(location):
             photo_url = None
             if "photos" in r:
                 photo_reference = r["photos"][0]["photo_reference"]
-                photo_url = f"https://maps.googleapis.com/maps/api/place/photo?maxwidth=800&photoreference={photo_reference}&key={GOOGLE_API_KEY}"
+                photo_url = f"https://maps.googleapis.com/maps/api/place/photo?maxwidth=800&photoreference={photo_reference}&key={GOOGLE_PLACES_API_KEY}"
 
             # 獲取評論
             reviews = get_reviews(place_id)
@@ -73,7 +74,7 @@ def get_reviews(place_id):
     review_url = "https://maps.googleapis.com/maps/api/place/details/json"
     params = {
         "place_id": place_id,
-        "key": GOOGLE_API_KEY,
+        "key": GOOGLE_PLACES_API_KEY,
         "language": "zh-TW"
     }
 
@@ -99,7 +100,7 @@ def get_route(origin, destination):
         "origin": origin,
         "destination": destination,
         "mode": "walking",  # 可用 driving、transit、bicycling
-        "key": GOOGLE_API_KEY
+        "key": GOOGLE_MAPS_API_KEY
     }
     response = requests.get(url, params=params).json()
 
