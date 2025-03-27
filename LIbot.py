@@ -25,7 +25,6 @@ def search_restaurants(query, location=None):
     }
     if location:
         params["location"] = location
-        params["radius"] = 2000  # 設定搜尋半徑 2 公里
 
     try:
         response = requests.get(url, params=params, timeout=10)
