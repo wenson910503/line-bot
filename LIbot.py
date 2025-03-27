@@ -3,9 +3,7 @@ import requests
 from flask import Flask, request, abort
 from linebot import LineBotApi, WebhookHandler
 from linebot.exceptions import InvalidSignatureError
-from linebot.models import (
-    MessageEvent, TextMessage, TextSendMessage, ImageSendMessage, LocationMessage
-)
+from linebot.models import MessageEvent, TextMessage, TextSendMessage, ImageSendMessage
 
 app = Flask(__name__)
 
@@ -17,14 +15,12 @@ handler = WebhookHandler('e95d4cac941b6109c3379f5cb7a7c46c')
 GOOGLE_PLACES_API_KEY = 'AIzaSyBqbjGjjpt3Bxo9RB15DE4uVBmoBRlNXVM'
 GOOGLE_MAPS_API_KEY = 'AIzaSyBqbjGjjpt3Bxo9RB15DE4uVBmoBRlNXVM'
 
-# 📍 搜尋附近餐廳（使用者回傳位置時觸發）
-def search_nearby_restaurants(lat, lng):
-    url = "https://maps.googleapis.com/maps/api/place/nearbysearch/json"
+# 📍 Google Places API 查詢函數（顯示最多 3 間餐廳）
+def search_restaurants(location):
+    url = "https://maps.googleapis.com/maps/api/place/textsearch/json"
     params = {
-        "location": f"{lat},{lng}",
-        "radius": 1500,  # 1.5 公里範圍內
-        "type": "restaurant",
-        "key": GOOGLE_PLACES_API_KEY,
+        "query": f"{location} 餐廳",
+        "key":GOOGLE_PLACES_API_KEY ,
         "language": "zh-TW",
     }
 
@@ -34,22 +30,23 @@ def search_nearby_restaurants(lat, lng):
         data = response.json()
 
         if "results" not in data or not data["results"]:
-            return ["😢 附近沒有找到餐廳，請換個位置試試看！"]
+            return ["😢 沒有找到相關餐廳，請換個關鍵字試試看！"]
 
         restaurants = sorted(data["results"], key=lambda r: r.get("rating", 0), reverse=True)[:3]
 
-        messages = ["🍽 **附近熱門餐廳推薦** 🍽\n"]
+        messages = ["🍽 **熱門餐廳推薦** 🍽\n"]
         for index, r in enumerate(restaurants, start=1):
             name = r.get("name", "未知餐廳")
             rating = r.get("rating", "無評分")
-            address = r.get("vicinity", "無地址資訊")
+            address = r.get("formatted_address", "無地址資訊")
+            business_status = r.get("business_status", "無營業資訊")
             place_id = r.get("place_id", "")
 
             # 獲取照片
             photo_url = None
             if "photos" in r:
                 photo_reference = r["photos"][0]["photo_reference"]
-                photo_url = f"https://maps.googleapis.com/maps/api/place/photo?maxwidth=800&photoreference={photo_reference}&key={GOOGLE_API_KEY}"
+                photo_url = f"https://maps.googleapis.com/maps/api/place/photo?maxwidth=800&photoreference={photo_reference}&key={GOOGLE_PLACES_API_KEY}"
 
             # 獲取評論
             reviews = get_reviews(place_id)
@@ -57,11 +54,13 @@ def search_nearby_restaurants(lat, lng):
             message = f"🏆 **{index}. {name}**\n"
             message += f"⭐ 評分：{rating}/5.0\n"
             message += f"📍 地址：{address}\n"
+            message += f"🕒 營業狀況：{business_status}\n"
             if reviews:
                 message += f"💬 最佳評論：{reviews}\n"
             message += f"🚗 [Google Maps 導航](https://www.google.com/maps/search/?api=1&query={address.replace(' ', '+')})\n"
 
             messages.append(message.strip())  # 加入文字訊息
+
             if photo_url:
                 messages.append(photo_url)  # 直接加入圖片 URL
 
@@ -101,7 +100,7 @@ def get_route(origin, destination):
         "origin": origin,
         "destination": destination,
         "mode": "walking",  # 可用 driving、transit、bicycling
-        "key": GOOGLE_MAPS_API_KEY_API_KEY
+        "key": GOOGLE_MAPS_API_KEY
     }
     response = requests.get(url, params=params).json()
 
@@ -127,34 +126,11 @@ def handle_message(event):
         messages = [reply_text]
 
     elif len(user_input) >= 2:  # 查詢餐廳
-        messages = search_nearby_restaurants(user_input)
+        messages = search_restaurants(user_input)
     else:
         messages = ["❌ 請輸入 **城市名稱 + 美食類型**（例如：「台北燒肉」），或使用 `路線 出發地 目的地` 查詢路線。"]
 
     # **發送訊息**
-    first_message_sent = False
-    for msg in messages:
-        if msg.startswith("http"):  # 圖片 URL
-            line_bot_api.push_message(
-                event.source.user_id,
-                ImageSendMessage(original_content_url=msg, preview_image_url=msg)
-            )
-        else:
-            text_message = TextSendMessage(text=msg)
-            if not first_message_sent:
-                line_bot_api.reply_message(event.reply_token, text_message)
-                first_message_sent = True
-            else:
-                line_bot_api.push_message(event.source.user_id, text_message)
-
-# 📍 處理使用者的「位置訊息」
-@handler.add(MessageEvent, message=LocationMessage)
-def handle_location(event):
-    lat = event.message.latitude
-    lng = event.message.longitude
-
-    messages = search_nearby_restaurants(lat, lng)
-
     first_message_sent = False
     for msg in messages:
         if msg.startswith("http"):  # 圖片 URL
