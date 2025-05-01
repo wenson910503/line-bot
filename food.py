@@ -12,15 +12,27 @@ app = Flask(__name__)
 line_bot_api = LineBotApi('i8DEpkz7jgRNnqRR4mWbPxC5oesrSpXbw2c+5xpzkLASeiBvdtv1uny/4/iXeO4lJygtxMZylP6IlFmQq/Lva/Ftd/H05aGKjTFlHZ3iSZo1sEMmBKRVMTTemEtU0zKtk9S9nqXIGc8CnOWSS80zKAdB04t89/1O/w1cDnyilFU=')
 handler = WebhookHandler('e95d4cac941b6109c3379f5cb7a7c46c')
 
+
+
+# 從環境變量中讀取 LINE 的 Token 和 Secret
+LINE_CHANNEL_ACCESS_TOKEN = os.getenv('i8DEpkz7jgRNnqRR4mWbPxC5oesrSpXbw2c+5xpzkLASeiBvdtv1uny/4/iXeO4lJygtxMZylP6IlFmQq/Lva/Ftd/H05aGKjTFlHZ3iSZo1sEMmBKRVMTTemEtU0zKtk9S9nqXIGc8CnOWSS80zKAdB04t89/1O/w1cDnyilFU=')  # 請確保在 Render 設置該環境變量
+LINE_CHANNEL_SECRET = os.getenv('e95d4cac941b6109c3379f5cb7a7c46c')  # 請確保在 Render 設置該環境變量
+
+line_bot_api = LineBotApi(LINE_CHANNEL_ACCESS_TOKEN)
+handler = WebhookHandler(LINE_CHANNEL_SECRET)
+
+# Google Vision API 用戶端設定
 client = vision.ImageAnnotatorClient()
 
 # 上傳圖片並識別食物
 def recognize_food(image_url):
     response = requests.get(image_url)
     image_content = response.content
+
     image = vision.Image(content=image_content)
     response = client.label_detection(image=image)
     labels = response.label_annotations
+
     if labels:
         food_name = labels[0].description
         return food_name
@@ -35,28 +47,40 @@ def get_recipe(food_name):
     }
     return recipes.get(food_name.lower(), "找不到此食物的製作過程，請嘗試其他食物。")
 
+# 處理 LINE Webhook 請求
 @app.route("/callback", methods=["POST"])
 def callback():
     signature = request.headers["X-Line-Signature"]
     body = request.get_data(as_text=True)
+
     try:
         handler.handle(body, signature)
     except InvalidSignatureError:
         abort(400)
+
     return "OK"
 
+# 處理使用者傳送的圖片
 @handler.add(MessageEvent, message=ImageMessage)
 def handle_image(event):
     message_id = event.message.id
     message_content = line_bot_api.get_message_content(message_id)
-    image_url = message_content.content_url
-    food_name = recognize_food(image_url)
-    if food_name:
+    image_data = b''.join(chunk for chunk in message_content.iter_content(1024))
+
+    # 用 Vision API 辨識
+    image = vision.Image(content=image_data)
+    response = client.label_detection(image=image)
+    labels = response.label_annotations
+
+    if labels:
+        food_name = labels[0].description
         recipe = get_recipe(food_name)
-        reply_message = TextSendMessage(text=f"您上傳的食物是：{food_name}\n製作過程：\n{recipe}")
+        reply = f"您上傳的食物是：{food_name}\n製作過程：\n{recipe}"
     else:
-        reply_message = TextSendMessage(text="無法識別圖片中的食物，請再試一次。")
-    line_bot_api.reply_message(event.reply_token, reply_message)
+        reply = "無法識別圖片中的食物，請再試一次。"
+
+    line_bot_api.reply_message(event.reply_token, TextSendMessage(text=reply))
 
 if __name__ == "__main__":
-    app.run(debug=True)
+    app.run(debug=True, host='0.0.0.0', port=int(os.getenv("PORT", 5000)))  # 設定 port 以配合 Render
+
