@@ -1,46 +1,36 @@
+
 import os
 import requests
 from flask import Flask, request, abort
 from linebot import LineBotApi, WebhookHandler
 from linebot.exceptions import InvalidSignatureError
-from linebot.models import MessageEvent, TextMessage, ImageMessage, ImageSendMessage, TextSendMessage
+from linebot.models import MessageEvent, TextMessage, ImageMessage, TextSendMessage
 from google.cloud import vision
 
-# ========== [API 金鑰與憑證設定區段] ==========
+# ====== 設定憑證路徑（Render Secret File 的路徑）======
+os.environ["third-crossing-452212-e9-11c4e2c430a0"] = '11c4e2c430a03e4211fec52487bb6d0386b8dcb9'
 
-# 設定 LINE BOT 金鑰
+# ====== LINE BOT 設定 ======
 LINE_CHANNEL_ACCESS_TOKEN = 'i8DEpkz7jgRNnqRR4mWbPxC5oesrSpXbw2c+5xpzkLASeiBvdtv1uny/4/iXeO4lJygtxMZylP6IlFmQq/Lva/Ftd/H05aGKjTFlHZ3iSZo1sEMmBKRVMTTemEtU0zKtk9S9nqXIGc8CnOWSS80zKAdB04t89/1O/w1cDnyilFU='
 LINE_CHANNEL_SECRET = 'e95d4cac941b6109c3379f5cb7a7c46c'
 
-# 設定 Google Vision API 憑證（這是你下載的 JSON 檔案路徑）
-os.environ["third-crossing-452212-e9-11c4e2c430a0"] =  '11c4e2c430a03e4211fec52487bb6d0386b8dcb9'
-# ========== [Flask 與 LINE BOT 設定區段] ==========
-
 app = Flask(__name__)
-line_bot_api = LineBotApi(LINE_CHANNEL_ACCESS_TOKEN)
-handler = WebhookHandler(LINE_CHANNEL_SECRET)
+line_bot_api = LineBotApi(i8DEpkz7jgRNnqRR4mWbPxC5oesrSpXbw2c+5xpzkLASeiBvdtv1uny/4/iXeO4lJygtxMZylP6IlFmQq/Lva/Ftd/H05aGKjTFlHZ3iSZo1sEMmBKRVMTTemEtU0zKtk9S9nqXIGc8CnOWSS80zKAdB04t89/1O/w1cDnyilFU=)
+handler = WebhookHandler(e95d4cac941b6109c3379f5cb7a7c46c)
 
-# 初始化 Google Vision API 用戶端
+# Google Vision API 初始化
 client = vision.ImageAnnotatorClient()
 
-# ========== [圖片辨識與食譜查詢功能區段] ==========
-
-# 使用 Vision API 辨識圖片中的食物
-def recognize_food(image_url):
-    response = requests.get(image_url)
-    image_content = response.content
-
-    image = vision.Image(content=image_content)
+# ====== 辨識食物函式 ======
+def recognize_food(image_bytes):
+    image = vision.Image(content=image_bytes)
     response = client.label_detection(image=image)
     labels = response.label_annotations
-
     if labels:
-        food_name = labels[0].description
-        return food_name
-    else:
-        return None
+        return labels[0].description
+    return None
 
-# 查找指定食物的製作過程
+# ====== 查詢食譜函式 ======
 def get_recipe(food_name):
     recipes = {
         "pizza": "1. 準備麵團\n2. 加入番茄醬和起司\n3. 放進烤箱烤約15分鐘",
@@ -48,11 +38,10 @@ def get_recipe(food_name):
     }
     return recipes.get(food_name.lower(), "找不到此食物的製作過程，請嘗試其他食物。")
 
-# ========== [LINE Webhook 路由區段] ==========
-
+# ====== LINE Webhook 路由 ======
 @app.route("/callback", methods=["POST"])
 def callback():
-    signature = request.headers["X-Line-Signature"]
+    signature = request.headers.get("X-Line-Signature", "")
     body = request.get_data(as_text=True)
 
     try:
@@ -62,19 +51,15 @@ def callback():
 
     return "OK"
 
-# 當使用者上傳圖片時，識別食物並回覆製作方式
+# ====== 處理圖片訊息 ======
 @handler.add(MessageEvent, message=ImageMessage)
 def handle_image(event):
     message_id = event.message.id
     message_content = line_bot_api.get_message_content(message_id)
     image_data = b''.join(chunk for chunk in message_content.iter_content(1024))
 
-    image = vision.Image(content=image_data)
-    response = client.label_detection(image=image)
-    labels = response.label_annotations
-
-    if labels:
-        food_name = labels[0].description
+    food_name = recognize_food(image_data)
+    if food_name:
         recipe = get_recipe(food_name)
         reply = f"您上傳的食物是：{food_name}\n製作過程：\n{recipe}"
     else:
@@ -82,7 +67,6 @@ def handle_image(event):
 
     line_bot_api.reply_message(event.reply_token, TextSendMessage(text=reply))
 
-# ========== [主程式啟動點] ==========
-
+# ====== 啟動伺服器 ======
 if __name__ == "__main__":
-    app.run(debug=True)
+    app.run(host="0.0.0.0", port=int(os.environ.get("PORT", 8080)))
