@@ -10,7 +10,7 @@ from google.cloud import vision  # Google Vision API 用於圖像識別
 app = Flask(__name__)
 
 line_bot_api = LineBotApi('YOUR_LINE_CHANNEL_ACCESS_TOKEN')
-handler = WebhookHandler('YOUR_LINE_CHANNEL_SECRET')
+handler = WebhookHandler('e95d4cac941b6109c3379f5cb7a7c46c')
 
 client = vision.ImageAnnotatorClient()
 
