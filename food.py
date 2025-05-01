@@ -13,7 +13,7 @@ LINE_CHANNEL_ACCESS_TOKEN = 'i8DEpkz7jgRNnqRR4mWbPxC5oesrSpXbw2c+5xpzkLASeiBvdtv
 LINE_CHANNEL_SECRET = 'e95d4cac941b6109c3379f5cb7a7c46c'
 
 # 設定 Google Vision API 憑證（這是你下載的 JSON 檔案路徑）
-os.environ["GOOGLE_APPLICATION_CREDENTIALS"] =  'AIzaSyBqbjGjjpt3Bxo9RB15DE4uVBmoBRlNXVM'
+os.environ["GOOGLE_APPLICATION_CREDENTIALS"] =  '25aecf693a70bdecf514441cde0f299ba0f2fd77'
 # ========== [Flask 與 LINE BOT 設定區段] ==========
 
 app = Flask(__name__)
