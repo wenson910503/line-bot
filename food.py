@@ -1,3 +1,11 @@
+import os
+import requests
+from flask import Flask, request, abort
+from linebot import LineBotApi, WebhookHandler
+from linebot.exceptions import InvalidSignatureError
+from linebot.models import MessageEvent, ImageMessage, TextSendMessage
+from google.cloud import vision
+
 app = Flask(__name__)
 
 # 從環境變數取得 LINE 憑證
