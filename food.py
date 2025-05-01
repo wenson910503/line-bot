@@ -9,8 +9,8 @@ from google.cloud import vision
 app = Flask(__name__)
 
 # 從環境變數取得 LINE 憑證
-line_bot_api = LineBotApi(os.getenv('i8DEpkz7jgRNnqRR4mWbPxC5oesrSpXbw2c+5xpzkLASeiBvdtv1uny/4/iXeO4lJygtxMZylP6IlFmQq/Lva/Ftd/H05aGKjTFlHZ3iSZo1sEMmBKRVMTTemEtU0zKtk9S9nqXIGc8CnOWSS80zKAdB04t89/1O/w1cDnyilFU='))
-handler = WebhookHandler(os.getenv('e95d4cac941b6109c3379f5cb7a7c46c'))
+line_bot_api = LineBotApi'i8DEpkz7jgRNnqRR4mWbPxC5oesrSpXbw2c+5xpzkLASeiBvdtv1uny/4/iXeO4lJygtxMZylP6IlFmQq/Lva/Ftd/H05aGKjTFlHZ3iSZo1sEMmBKRVMTTemEtU0zKtk9S9nqXIGc8CnOWSS80zKAdB04t89/1O/w1cDnyilFU='
+handler = WebhookHandler'e95d4cac941b6109c3379f5cb7a7c46c'
 
 # 初始化 Vision API
 client = vision.ImageAnnotatorClient()
