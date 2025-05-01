@@ -1,29 +1,24 @@
-# ========== [主程式開始區段] ==========
-
 app = Flask(__name__)
 
-line_bot_api = LineBotApi('i8DEpkz7jgRNnqRR4mWbPxC5oesrSpXbw2c+5xpzkLASeiBvdtv1uny/4/iXeO4lJygtxMZylP6IlFmQq/Lva/Ftd/H05aGKjTFlHZ3iSZo1sEMmBKRVMTTemEtU0zKtk9S9nqXIGc8CnOWSS80zKAdB04t89/1O/w1cDnyilFU=')  # 請替換為你的 Token
-handler = WebhookHandler('e95d4cac941b6109c3379f5cb7a7c46c')         # 請替換為你的 Secret
+# 從環境變數取得 LINE 憑證
+line_bot_api = LineBotApi(os.getenv('i8DEpkz7jgRNnqRR4mWbPxC5oesrSpXbw2c+5xpzkLASeiBvdtv1uny/4/iXeO4lJygtxMZylP6IlFmQq/Lva/Ftd/H05aGKjTFlHZ3iSZo1sEMmBKRVMTTemEtU0zKtk9S9nqXIGc8CnOWSS80zKAdB04t89/1O/w1cDnyilFU='))
+handler = WebhookHandler(os.getenv('e95d4cac941b6109c3379f5cb7a7c46c'))
 
-# Google Vision API 用戶端設定
+# 初始化 Vision API
 client = vision.ImageAnnotatorClient()
 
-# 上傳圖片並識別食物
-def recognize_food(image_url):
-    response = requests.get(image_url)
-    image_content = response.content
-
-    image = vision.Image(content=image_content)
+# 食物名稱辨識
+def recognize_food(image_bytes):
+    image = vision.Image(content=image_bytes)
     response = client.label_detection(image=image)
     labels = response.label_annotations
 
     if labels:
-        food_name = labels[0].description
-        return food_name
+        return labels[0].description
     else:
         return None
 
-# 查找食物的製作過程
+# 食譜查詢
 def get_recipe(food_name):
     recipes = {
         "pizza": "1. 準備麵團\n2. 加入番茄醬和起司\n3. 放進烤箱烤約15分鐘",
@@ -31,7 +26,7 @@ def get_recipe(food_name):
     }
     return recipes.get(food_name.lower(), "找不到此食物的製作過程，請嘗試其他食物。")
 
-# 處理 LINE Webhook 請求
+# LINE webhook 入口
 @app.route("/callback", methods=["POST"])
 def callback():
     signature = request.headers["X-Line-Signature"]
@@ -44,20 +39,16 @@ def callback():
 
     return "OK"
 
-# 處理使用者傳送的圖片
+# 處理圖片訊息
 @handler.add(MessageEvent, message=ImageMessage)
 def handle_image(event):
     message_id = event.message.id
     message_content = line_bot_api.get_message_content(message_id)
-    image_data = b''.join(chunk for chunk in message_content.iter_content(1024))
+    image_bytes = b''.join(chunk for chunk in message_content.iter_content(1024))
 
-    # 用 Vision API 辨識
-    image = vision.Image(content=image_data)
-    response = client.label_detection(image=image)
-    labels = response.label_annotations
+    food_name = recognize_food(image_bytes)
 
-    if labels:
-        food_name = labels[0].description
+    if food_name:
         recipe = get_recipe(food_name)
         reply = f"您上傳的食物是：{food_name}\n製作過程：\n{recipe}"
     else:
@@ -65,5 +56,6 @@ def handle_image(event):
 
     line_bot_api.reply_message(event.reply_token, TextSendMessage(text=reply))
 
+# Render 啟動設定
 if __name__ == "__main__":
-    app.run(debug=True)
+    app.run(debug=True, host="0.0.0.0", port=int(os.getenv("PORT", 5000)))
