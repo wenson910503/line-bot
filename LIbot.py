@@ -1,21 +1,3 @@
-import os
-import re
-import requests
-from flask import Flask, request, abort
-from linebot import LineBotApi, WebhookHandler
-from linebot.exceptions import InvalidSignatureError
-from linebot.models import MessageEvent, TextMessage, TextSendMessage, ImageSendMessage
-
-app = Flask(__name__)
-
-# 🚀 填入你的 LINE Bot API Key
-line_bot_api = LineBotApi('i8DEpkz7jgRNnqRR4mWbPxC5oesrSpXbw2c+5xpzkLASeiBvdtv1uny/4/iXeO4lJygtxMZylP6IlFmQq/Lva/Ftd/H05aGKjTFlHZ3iSZo1sEMmBKRVMTTemEtU0zKtk9S9nqXIGc8CnOWSS80zKAdB04t89/1O/w1cDnyilFU=')
-handler = WebhookHandler('e95d4cac941b6109c3379f5cb7a7c46c')
-
-# 🚀 填入你的 Google Places API Key
-GOOGLE_PLACES_API_KEY = 'AIzaSyBqbjGjjpt3Bxo9RB15DE4uVBmoBRlNXVM'
-GOOGLE_MAPS_API_KEY = 'AIzaSyBqbjGjjpt3Bxo9RB15DE4uVBmoBRlNXVM'
-
 import os  # 用於存取環境變數
 import re  # 用於正則表達式處理（如移除 HTML 標籤）
 import requests  # 用來發送 HTTP 請求的第三方模組
@@ -148,5 +130,7 @@ def get_route(origin, destination):  # 定義一個函式，接收出發地與�
             return directions  # 回傳整理好的文字路線資訊
         else:
             return "無法取得路線，請確認地點是否正確。"  # 若 API 回應不成功，回傳錯誤訊息
+    except requests.exceptions.RequestException as e:  # 捕捉請求錯誤
+        return f"查詢路線時發生錯誤：{e}"  # 回傳錯誤原因
     except requests.exceptions.RequestException as e:  # 捕捉請求錯誤
         return f"查詢路線時發生錯誤：{e}"  # 回傳錯誤原因
