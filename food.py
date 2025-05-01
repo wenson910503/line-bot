@@ -8,7 +8,7 @@ from linebot.models import MessageEvent, TextMessage, ImageMessage, TextSendMess
 from google.cloud import vision
 
 # ====== 設定憑證路徑（Render Secret File 的路徑）======
-os.environ["GOOGLE_APPLICATION_CREDENTIALS"] = "/etc/secrets/vision_key.json"
+os.environ["GOOGLE_APPLICATION_CREDENTIALS"] = "vision-api-key.json"
 
 # ====== LINE BOT 設定 ======
 LINE_CHANNEL_ACCESS_TOKEN = 'i8DEpkz7jgRNnqRR4mWbPxC5oesrSpXbw2c+5xpzkLASeiBvdtv1uny/4/iXeO4lJygtxMZylP6IlFmQq/Lva/Ftd/H05aGKjTFlHZ3iSZo1sEMmBKRVMTTemEtU0zKtk9S9nqXIGc8CnOWSS80zKAdB04t89/1O/w1cDnyilFU='
