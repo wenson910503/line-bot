@@ -1,25 +1,20 @@
-
 import os
 import requests
 from flask import Flask, request, abort
 from linebot import LineBotApi, WebhookHandler
 from linebot.exceptions import InvalidSignatureError
 from linebot.models import MessageEvent, TextMessage, ImageMessage, TextSendMessage
-from google.cloud import vision  # Google Vision API 用於圖像識別
+from google.cloud import vision
 
+# 設定 Flask 應用
 app = Flask(__name__)
-
-line_bot_api = LineBotApi('i8DEpkz7jgRNnqRR4mWbPxC5oesrSpXbw2c+5xpzkLASeiBvdtv1uny/4/iXeO4lJygtxMZylP6IlFmQq/Lva/Ftd/H05aGKjTFlHZ3iSZo1sEMmBKRVMTTemEtU0zKtk9S9nqXIGc8CnOWSS80zKAdB04t89/1O/w1cDnyilFU=')
-handler = WebhookHandler('e95d4cac941b6109c3379f5cb7a7c46c')
-
-
 
 # 從環境變量中讀取 LINE 的 Token 和 Secret
 LINE_CHANNEL_ACCESS_TOKEN = os.getenv('i8DEpkz7jgRNnqRR4mWbPxC5oesrSpXbw2c+5xpzkLASeiBvdtv1uny/4/iXeO4lJygtxMZylP6IlFmQq/Lva/Ftd/H05aGKjTFlHZ3iSZo1sEMmBKRVMTTemEtU0zKtk9S9nqXIGc8CnOWSS80zKAdB04t89/1O/w1cDnyilFU=')  # 請確保在 Render 設置該環境變量
 LINE_CHANNEL_SECRET = os.getenv('e95d4cac941b6109c3379f5cb7a7c46c')  # 請確保在 Render 設置該環境變量
 
-line_bot_api = LineBotApi(LINE_CHANNEL_ACCESS_TOKEN)
-handler = WebhookHandler(LINE_CHANNEL_SECRET)
+line_bot_api = LineBotApi(i8DEpkz7jgRNnqRR4mWbPxC5oesrSpXbw2c+5xpzkLASeiBvdtv1uny/4/iXeO4lJygtxMZylP6IlFmQq/Lva/Ftd/H05aGKjTFlHZ3iSZo1sEMmBKRVMTTemEtU0zKtk9S9nqXIGc8CnOWSS80zKAdB04t89/1O/w1cDnyilFU=)
+handler = WebhookHandler(e95d4cac941b6109c3379f5cb7a7c46c)
 
 # Google Vision API 用戶端設定
 client = vision.ImageAnnotatorClient()
@@ -83,4 +78,3 @@ def handle_image(event):
 
 if __name__ == "__main__":
     app.run(debug=True, host='0.0.0.0', port=int(os.getenv("PORT", 5000)))  # 設定 port 以配合 Render
-
