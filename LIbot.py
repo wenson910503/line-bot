@@ -1,4 +1,5 @@
 import os
+import re
 import requests
 from flask import Flask, request, abort
 from linebot import LineBotApi, WebhookHandler
@@ -20,7 +21,7 @@ def search_restaurants(location):
     url = "https://maps.googleapis.com/maps/api/place/textsearch/json"
     params = {
         "query": f"{location} 餐廳",
-        "key":GOOGLE_PLACES_API_KEY ,
+        "key": GOOGLE_PLACES_API_KEY,
         "language": "zh-TW",
     }
 
@@ -59,17 +60,17 @@ def search_restaurants(location):
                 message += f"💬 最佳評論：{reviews}\n"
             message += f"🚗 [Google Maps 導航](https://www.google.com/maps/search/?api=1&query={address.replace(' ', '+')})\n"
 
-            messages.append(message.strip())  # 加入文字訊息
+            messages.append(message.strip())
 
             if photo_url:
-                messages.append(photo_url)  # 直接加入圖片 URL
+                messages.append(photo_url)
 
         return messages
 
     except requests.exceptions.RequestException as e:
         return [f"❌ 無法獲取餐廳資訊：{e}"]
 
-# 🔄 獲取餐廳評論
+# ➜ 獲取餐廳評論
 def get_reviews(place_id):
     review_url = "https://maps.googleapis.com/maps/api/place/details/json"
     params = {
@@ -93,30 +94,42 @@ def get_reviews(place_id):
     except requests.exceptions.RequestException:
         return None
 
-# 🛣 查詢路線（Google Directions API）
+# 🚣 查詢路線（Google Directions API，已中文化並加入導航連結）
 def get_route(origin, destination):
-    url = f"https://maps.googleapis.com/maps/api/directions/json"
+    url = "https://maps.googleapis.com/maps/api/directions/json"
     params = {
         "origin": origin,
         "destination": destination,
-        "mode": "walking",  # 可用 driving、transit、bicycling
+        "mode": "walking",
+        "language": "zh-TW",
         "key": GOOGLE_MAPS_API_KEY
     }
-    response = requests.get(url, params=params).json()
 
-    if response["status"] == "OK":
-        steps = response["routes"][0]["legs"][0]["steps"]
-        directions = "\n".join([step["html_instructions"].replace("<b>", "").replace("</b>", "") for step in steps])
-        return directions
-    else:
-        return "🚫 無法取得路線，請確認地點是否正確。"
+    try:
+        response = requests.get(url, params=params, timeout=10)
+        response.raise_for_status()
+        data = response.json()
+
+        if data["status"] == "OK":
+            steps = data["routes"][0]["legs"][0]["steps"]
+            directions = "\n".join([
+                f"{i+1}. {re.sub('<[^<]+?>', '', step['html_instructions'])}"
+                for i, step in enumerate(steps)
+            ])
+            map_link = f"https://www.google.com/maps/dir/?api=1&origin={origin}&destination={destination}&travelmode=walking"
+            directions += f"\n\n📍 點我直接導航：\n👉 {map_link}"
+            return directions
+        else:
+            return "🚫 無法取得路線，請確認地點是否正確。"
+    except requests.exceptions.RequestException as e:
+        return f"❌ 查詢路線時發生錯誤：{e}"
 
 # 📨 處理 LINE 訊息
 @handler.add(MessageEvent, message=TextMessage)
 def handle_message(event):
     user_input = event.message.text.strip()
 
-    if user_input.startswith("路線 "):  # 查詢路線，例如："路線 台北車站 雄大餐廳"
+    if user_input.startswith("路線 "):
         try:
             _, origin, destination = user_input.split()
             route_info = get_route(origin, destination)
@@ -125,15 +138,14 @@ def handle_message(event):
             reply_text = "❌ 請輸入格式：**路線 出發地 目的地**"
         messages = [reply_text]
 
-    elif len(user_input) >= 2:  # 查詢餐廳
+    elif len(user_input) >= 2:
         messages = search_restaurants(user_input)
     else:
-        messages = ["❌ 請輸入 **城市名稱 + 美食類型**（例如：「台北燒肉」），或使用 `路線 出發地 目的地` 查詢路線。"]
+        messages = ["❌ 請輸入 **城市名稱 + 美食類型**（例如：「臺北燒肉」），或使用 路線 出發地 目的地 查詢路線。"]
 
-    # **發送訊息**
     first_message_sent = False
     for msg in messages:
-        if msg.startswith("http"):  # 圖片 URL
+        if msg.startswith("http"):
             line_bot_api.push_message(
                 event.source.user_id,
                 ImageSendMessage(original_content_url=msg, preview_image_url=msg)
