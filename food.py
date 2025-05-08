@@ -33,7 +33,7 @@ def recognize_food(image_bytes):
 def get_recipe(food_name):
     recipes = {
         "pizza": "1. 準備麵團\n2. 加入番茄醬和起司\n3. 放進烤箱烤約15分鐘",
-        "burger": "1. 準備漢堡麵包\n2. 煎牛肉餅\n3. 組合：麵包 + 牛肉餅 + 生菜 + 番茄"
+        "hamburger": "1. 準備漢堡麵包\n2. 煎牛肉餅\n3. 組合：麵包 + 牛肉餅 + 生菜 + 番茄"
     }
     return recipes.get(food_name.lower(), "找不到此食物的製作過程，請嘗試其他食物。")
 
