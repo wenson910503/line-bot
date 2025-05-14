@@ -1,4 +1,5 @@
 import os
+import re
 import requests
 from flask import Flask, request, abort
 from linebot import LineBotApi, WebhookHandler
@@ -7,13 +8,13 @@ from linebot.models import MessageEvent, TextMessage, TextSendMessage, ImageSend
 
 app = Flask(__name__)
 
-# 替換成你的 LINE Bot 金鑰
-line_bot_api = LineBotApi('你的 LINE CHANNEL ACCESS TOKEN')
-handler = WebhookHandler('你的 CHANNEL SECRET')
+# 🚀 填入你的 LINE Bot API Key
+line_bot_api = LineBotApi('i8DEpkz7jgRNnqRR4mWbPxC5oesrSpXbw2c+5xpzkLASeiBvdtv1uny/4/iXeO4lJygtxMZylP6IlFmQq/Lva/Ftd/H05aGKjTFlHZ3iSZo1sEMmBKRVMTTemEtU0zKtk9S9nqXIGc8CnOWSS80zKAdB04t89/1O/w1cDnyilFU=')
+handler = WebhookHandler('e95d4cac941b6109c3379f5cb7a7c46c')
 
-# 替換成你的 Google Places API 金鑰
-GOOGLE_PLACES_API_KEY = '你的 GOOGLE API KEY'
-
+# 🚀 填入你的 Google Places API Key
+GOOGLE_PLACES_API_KEY = 'AIzaSyBqbjGjjpt3Bxo9RB15DE4uVBmoBRlNXVM'
+GOOGLE_MAPS_API_KEY = 'AIzaSyBqbjGjjpt3Bxo9RB15DE4uVBmoBRlNXVM'
 # ➜ 取得評論
 def get_reviews(place_id):
     url = "https://maps.googleapis.com/maps/api/place/details/json"
