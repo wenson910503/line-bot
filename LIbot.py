@@ -1,121 +1,45 @@
 import os
-import re
 import requests
 from flask import Flask, request, abort
 from linebot import LineBotApi, WebhookHandler
 from linebot.exceptions import InvalidSignatureError
-from linebot.models import MessageEvent, TextMessage, TextSendMessage, ImageSendMessage
+from linebot.models import MessageEvent, TextMessage, ImageMessage, TextSendMessage
+from google.cloud import vision
 
+# ====== 設定憑證路徑（Render Secret File 的路徑）======
+os.environ["GOOGLE_APPLICATION_CREDENTIALS"] = "vision-api-key.json"
+
+# ====== LINE BOT 設定 ======
+LINE_CHANNEL_ACCESS_TOKEN = 'i8DEpkz7jgRNnqRR4mWbPxC5oesrSpXbw2c+5xpzkLASeiBvdtv1uny/4/iXeO4lJygtxMZylP6IlFmQq/Lva/Ftd/H05aGKjTFlHZ3iSZo1sEMmBKRVMTTemEtU0zKtk9S9nqXIGc8CnOWSS80zKAdB04t89/1O/w1cDnyilFU='
+LINE_CHANNEL_SECRET = 'e95d4cac941b6109c3379f5cb7a7c46c'
+
+# === 初始化 ===
 app = Flask(__name__)
+line_bot_api = LineBotApi(LINE_CHANNEL_ACCESS_TOKEN)
+handler = WebhookHandler(LINE_CHANNEL_SECRET)
+client = vision.ImageAnnotatorClient()
 
-# 🚀 填入你的 LINE Bot API Key
-line_bot_api = LineBotApi('i8DEpkz7jgRNnqRR4mWbPxC5oesrSpXbw2c+5xpzkLASeiBvdtv1uny/4/iXeO4lJygtxMZylP6IlFmQq/Lva/Ftd/H05aGKjTFlHZ3iSZo1sEMmBKRVMTTemEtU0zKtk9S9nqXIGc8CnOWSS80zKAdB04t89/1O/w1cDnyilFU=')
-handler = WebhookHandler('e95d4cac941b6109c3379f5cb7a7c46c')
+# === 食物辨識函式 ===
+def recognize_food(image_bytes):
+    image = vision.Image(content=image_bytes)
+    response = client.label_detection(image=image)
+    labels = response.label_annotations
+    if labels:
+        return labels[0].description
+    return None
 
-# 🚀 填入你的 Google Places API Key
-GOOGLE_PLACES_API_KEY = 'AIzaSyBqbjGjjpt3Bxo9RB15DE4uVBmoBRlNXVM'
-GOOGLE_MAPS_API_KEY = 'AIzaSyBqbjGjjpt3Bxo9RB15DE4uVBmoBRlNXVM'
-# ➜ 取得評論
-def get_reviews(place_id):
-    url = "https://maps.googleapis.com/maps/api/place/details/json"
-    params = {
-        "place_id": place_id,
-        "key": GOOGLE_PLACES_API_KEY,
-        "language": "zh-TW"
+# === 模擬查詢食譜函式 ===
+def get_recipe(food_name):
+    recipes = {
+        "pizza": "1. 準備麵團\n2. 加入番茄醬和起司\n3. 放進烤箱烤約15分鐘",
+        "hamburger": "1. 準備漢堡麵包\n2. 煎牛肉餅\n3. 組合：麵包 + 牛肉餅 + 生菜 + 番茄"
     }
-    try:
-        response = requests.get(url, params=params, timeout=10)
-        data = response.json()
-        if "result" in data and "reviews" in data["result"]:
-            reviews = data["result"]["reviews"]
-            for review in reviews:
-                if 'zh' in review['language']:
-                    return review['text']
-            return reviews[0]['text'] if reviews else None
-    except:
-        return None
+    return recipes.get(food_name.lower(), "找不到此食物的製作過程，請嘗試其他食物。")
 
-# ➜ 餐廳搜尋
-def search_restaurants(location):
-    url = "https://maps.googleapis.com/maps/api/place/textsearch/json"
-    params = {
-        "query": f"{location} 餐廳",
-        "key": GOOGLE_PLACES_API_KEY,
-        "language": "zh-TW",
-    }
-
-    try:
-        response = requests.get(url, params=params, timeout=10)
-        data = response.json()
-
-        if "results" not in data or not data["results"]:
-            return ["😢 沒有找到相關餐廳，請換個關鍵字試試看！"]
-
-        restaurants = sorted(data["results"], key=lambda r: r.get("rating", 0), reverse=True)[:3]
-        messages = ["🍽 **熱門餐廳推薦** 🍽\n"]
-
-        for index, r in enumerate(restaurants, start=1):
-            name = r.get("name", "未知餐廳")
-            rating = r.get("rating", "無評分")
-            address = r.get("formatted_address", "無地址資訊")
-            business_status = r.get("business_status", "無營業資訊")
-            place_id = r.get("place_id", "")
-
-            # 照片
-            photo_url = None
-            if "photos" in r:
-                photo_reference = r["photos"][0]["photo_reference"]
-                photo_url = f"https://maps.googleapis.com/maps/api/place/photo?maxwidth=800&photoreference={photo_reference}&key={GOOGLE_PLACES_API_KEY}"
-
-            # 評論
-            reviews = get_reviews(place_id)
-
-            message = f"🏆 **{index}. {name}**\n"
-            message += f"⭐ 評分：{rating}/5.0\n"
-            message += f"📍 地址：{address}\n"
-            message += f"🕒 營業狀況：{business_status}\n"
-            if reviews:
-                message += f"💬 最佳評論：{reviews}"
-
-            messages.append(message.strip())
-
-            if photo_url:
-                messages.append(photo_url)
-
-        return messages
-
-    except requests.exceptions.RequestException as e:
-        return [f"❌ 無法獲取餐廳資訊：{e}"]
-
-# ➜ 處理使用者訊息
-@handler.add(MessageEvent, message=TextMessage)
-def handle_message(event):
-    user_input = event.message.text.strip()
-
-    if len(user_input) >= 2:
-        messages = search_restaurants(user_input)
-    else:
-        messages = ["❌ 請輸入 **城市名稱 + 美食類型**（例如：「臺北燒肉」）"]
-
-    first_message_sent = False
-    for msg in messages:
-        if msg.startswith("http"):
-            line_bot_api.push_message(
-                event.source.user_id,
-                ImageSendMessage(original_content_url=msg, preview_image_url=msg)
-            )
-        else:
-            text_message = TextSendMessage(text=msg)
-            if not first_message_sent:
-                line_bot_api.reply_message(event.reply_token, text_message)
-                first_message_sent = True
-            else:
-                line_bot_api.push_message(event.source.user_id, text_message)
-
-# ➜ Webhook 接收端
-@app.route("/callback", methods=['POST'])
+# === Webhook 路由 ===
+@app.route("/callback", methods=["POST"])
 def callback():
-    signature = request.headers.get('X-Line-Signature', '')
+    signature = request.headers.get("X-Line-Signature", "")
     body = request.get_data(as_text=True)
 
     try:
@@ -123,8 +47,24 @@ def callback():
     except InvalidSignatureError:
         abort(400)
 
-    return 'OK'
+    return "OK"
 
-# ➜ 啟動伺服器
-if __name__ == '__main__':
-    app.run(host='0.0.0.0', port=int(os.environ.get('PORT', 5000)))
+# === 處理圖片訊息 ===
+@handler.add(MessageEvent, message=ImageMessage)
+def handle_image(event):
+    message_id = event.message.id
+    message_content = line_bot_api.get_message_content(message_id)
+    image_data = b''.join(chunk for chunk in message_content.iter_content(1024))
+
+    food_name = recognize_food(image_data)
+    if food_name:
+        recipe = get_recipe(food_name)
+        reply = f"您上傳的食物是：{food_name}\n製作過程：\n{recipe}"
+    else:
+        reply = "無法識別圖片中的食物，請再試一次。"
+
+    line_bot_api.reply_message(event.reply_token, TextSendMessage(text=reply))
+
+# === 本地端啟動（Render 會自動指定 PORT） ===
+if __name__ == "__main__":
+    app.run(host="0.0.0.0", port=int(os.environ.get("PORT", 8080)))
